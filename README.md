@@ -35,4 +35,11 @@ Install the BRAT plugin via the Obsidian Plugin Browser and then add the beta re
 
 ### Manually installing the plugin
 
-- Copy over `main.js`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/obsidian-embedded-query-control/`.
+- Copy over `main.js`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/query-control/`.
+
+### Developing and testing in Obsidian
+
+- Put this repository directly under `VaultFolder/.obsidian/plugins/query-control/`.
+- Run `pnpm install`.
+- Run `pnpm dev` to watch and rebuild `main.js` in place whenever you change `src/*.ts`.
+- In Obsidian, reload the app or disable and re-enable the plugin after each rebuild.

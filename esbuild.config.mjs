@@ -8,41 +8,67 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
-const prod = process.argv[2] === "production";
+const args = process.argv.slice(2);
+const prod = args.includes("production");
+const watch = args.includes("--watch");
+
+const buildOptions = {
+  banner: {
+    js: banner,
+  },
+  minify: prod,
+  entryPoints: ["src/main.ts"],
+  bundle: true,
+  external: [
+    "obsidian",
+    "electron",
+    "codemirror",
+    "@codemirror/closebrackets",
+    "@codemirror/commands",
+    "@codemirror/fold",
+    "@codemirror/gutter",
+    "@codemirror/history",
+    "@codemirror/language",
+    "@codemirror/rangeset",
+    "@codemirror/rectangular-selection",
+    "@codemirror/search",
+    "@codemirror/state",
+    "@codemirror/stream-parser",
+    "@codemirror/text",
+    "@codemirror/view",
+    ...builtins,
+  ],
+  format: "cjs",
+  target: "es2016",
+  logLevel: "info",
+  sourcemap: prod ? false : "inline",
+  treeShaking: true,
+  outfile: "main.js",
+};
+
+const watchOptions = watch
+  ? {
+      watch: {
+        onRebuild(error) {
+          if (error) {
+            console.error("Rebuild failed:", error);
+            return;
+          }
+
+          console.log("Rebuild succeeded.");
+        },
+      },
+    }
+  : {};
 
 esbuild
   .build({
-    banner: {
-      js: banner,
-    },
-    minify: prod,
-    entryPoints: ["src/main.ts"],
-    bundle: true,
-    external: [
-      "obsidian",
-      "electron",
-      "codemirror",
-      "@codemirror/closebrackets",
-      "@codemirror/commands",
-      "@codemirror/fold",
-      "@codemirror/gutter",
-      "@codemirror/history",
-      "@codemirror/language",
-      "@codemirror/rangeset",
-      "@codemirror/rectangular-selection",
-      "@codemirror/search",
-      "@codemirror/state",
-      "@codemirror/stream-parser",
-      "@codemirror/text",
-      "@codemirror/view",
-      ...builtins,
-    ],
-    format: "cjs",
-    watch: false,
-    target: "es2016",
-    logLevel: "info",
-    sourcemap: prod ? false : "inline",
-    treeShaking: true,
-    outfile: "dist/main.js",
+    ...buildOptions,
+    ...watchOptions,
+  })
+  .then(() => {
+    if (watch) {
+      console.log("Watching for changes...");
+    }
   })
   .catch(() => process.exit(1));
