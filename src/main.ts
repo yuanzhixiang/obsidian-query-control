@@ -7,11 +7,12 @@ import {
   Modal,
   Notice,
   Plugin,
-  SearchHeaderDOM,
   SearchResultDOM,
   SearchResultItem,
   SearchView,
   Setting,
+  setIcon,
+  setTooltip,
   ViewCreator,
   WorkspaceLeaf
 } from "obsidian";
@@ -45,8 +46,24 @@ import {SortOption} from "./obsidian";
 
 const backlinkDoms = new WeakMap<HTMLElement, any>();
 
+function createSearchHeaderDom(el: HTMLElement) {
+  const navHeaderEl = el.createDiv({cls: "nav-header", prepend: true});
+  const navButtonsEl = navHeaderEl.createDiv("nav-buttons-container");
+
+  return {
+    navHeaderEl,
+    addNavButton(icon: string, label: string, onClick: (evt: MouseEvent) => any, className?: string) {
+      const buttonEl = navButtonsEl.createDiv("clickable-icon nav-action-button");
+      if (className) buttonEl.addClass(className);
+      buttonEl.addEventListener("click", onClick);
+      setIcon(buttonEl, icon);
+      setTooltip(buttonEl, label);
+      return buttonEl;
+    },
+  };
+}
+
 export default class EmbeddedQueryControlPlugin extends Plugin {
-  SearchHeaderDOM: typeof SearchHeaderDOM;
   SearchResultsExport: any;
   settings: EmbeddedQueryControlSettings;
   settingsTab: SettingTab;
@@ -89,16 +106,6 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
         searchView.onCopyResultsClick(new MouseEvent(null));
         uninstall();
       });
-      let eventRef2 = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
-        if (type !== "backlink") return;
-        this.app.workspace.offref(eventRef2);
-        // @ts-ignore we need a leaf before any leafs exists in the workspace, so we create one from scratch
-        let leaf = new WorkspaceLeaf(plugin.app);
-        let searchView = viewCreator(leaf) as SearchView;
-        plugin.SearchHeaderDOM = searchView.backlink.headerDom.constructor as typeof SearchHeaderDOM;
-      });
-    } else {
-      this.initializeSearchHeaderDOM();
     }
 
     // The only way to obtain the EmbeddedSearch class is to catch it while it's being added to a parent component
@@ -149,41 +156,6 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
   registerSettingsTab() {
     this.settingsTab = new SettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
-  }
-
-  initializeSearchHeaderDOM() {
-    const existingBacklinkLeaf = this.app.workspace.getLeavesOfType("backlink")?.first();
-    const existingHeaderDom: any = (existingBacklinkLeaf?.view as any)?.backlink?.headerDom;
-    if (existingHeaderDom?.constructor) {
-      this.SearchHeaderDOM = existingHeaderDom.constructor as typeof SearchHeaderDOM;
-      return;
-    }
-
-    const backlinkViewCreator = this.app.viewRegistry.viewByType?.["backlink"];
-    if (!backlinkViewCreator) {
-      return;
-    }
-
-    try {
-      // @ts-ignore we only need a temporary leaf to construct the view and read headerDom.
-      const leaf = new WorkspaceLeaf(this.app);
-      const backlinkView = backlinkViewCreator(leaf) as any;
-      const headerDom = backlinkView?.backlink?.headerDom;
-
-      if (headerDom?.constructor) {
-        this.SearchHeaderDOM = headerDom.constructor as typeof SearchHeaderDOM;
-        return;
-      }
-    } catch (err) {
-      console.error("Error initializing SearchHeaderDOM after layoutReady:", err);
-    }
-  }
-
-  getSearchHeader(): typeof SearchHeaderDOM {
-    let backlinkTab = this.app.workspace.getLeavesOfType("backlink")?.first();
-    backlinkTab?.loadIfDeferred();
-    let searchHeader: any = backlinkTab?.view?.backlink?.headerDom;
-    return searchHeader?.constructor;
   }
 
 
@@ -340,19 +312,9 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
 
                 // Are we in an embedded search view?
                 if (!this.patched && this.el.parentElement?.hasClass("internal-query")) {
-                  let _SearchHeaderDOM = plugin.SearchHeaderDOM ? plugin.SearchHeaderDOM : plugin.getSearchHeader();
                   let defaultHeaderEl = this.el.parentElement.querySelector(".internal-query-header");
 
-                  if (!_SearchHeaderDOM) {
-                    console.error('Error: _SearchHeaderDOM is undefined. Cannot create headerDom.', {
-                      parentClassName: this.el.parentElement?.className,
-                      hasDefaultHeaderEl: !!defaultHeaderEl,
-                    });
-                    // Handle the error or exit the function
-                    return;
-                  }
-
-                  if (this.el?.closest(".internal-query")) {
+                  if (defaultHeaderEl && this.el?.closest(".internal-query")) {
                     this.patched = true;
                     defaultHeaderEl = this.el.parentElement.querySelector(".internal-query-header");
                     this.setExtraContext = function (value: boolean) {
@@ -428,7 +390,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                     };
 
 
-                    let headerDom = (this.headerDom = new _SearchHeaderDOM(this.app, this.el.parentElement));
+                    let headerDom = (this.headerDom = createSearchHeaderDom(this.el.parentElement));
                     defaultHeaderEl.insertAdjacentElement("afterend", headerDom.navHeaderEl);
                     this.collapseAllButtonEl = headerDom.addNavButton(
                         "bullet-list",
