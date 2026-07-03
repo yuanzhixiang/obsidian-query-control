@@ -1,15 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import "obsidian";
+
+type QueryControlSettingValue = boolean | string;
 
 declare module "obsidian" {
   export interface Workspace extends Events {
-    on(name: "status-bar-updated", callback: () => any, ctx?: any): EventRef;
-    on(name: "ribbon-bar-updated", callback: () => any, ctx?: any): EventRef;
-    on(name: "bartender-workspace-change", callback: () => any, ctx?: any): EventRef;
+    on(name: "status-bar-updated", callback: () => unknown, ctx?: unknown): EventRef;
+    on(name: "ribbon-bar-updated", callback: () => unknown, ctx?: unknown): EventRef;
+    on(name: "bartender-workspace-change", callback: () => unknown, ctx?: unknown): EventRef;
     on(
       name: "bartender-leaf-split",
-      callback: (originLeaf: WorkspaceItem, newLeaf: WorkspaceItem) => any,
-      ctx?: any
+      callback: (originLeaf: WorkspaceItem, newLeaf: WorkspaceItem) => unknown,
+      ctx?: unknown
     ): EventRef;
   }
   interface View {
@@ -48,7 +49,7 @@ declare module "obsidian" {
     showTitle: boolean;
     collapseAll: boolean;
     sortOrder: string;
-    settings: Record<string, any>;
+    settings: Record<string, QueryControlSettingValue>;
     vChildren?: SearchResultRootElements;
     parent?: SearchView;
     children: SearchResultItem[];
@@ -67,7 +68,7 @@ declare module "obsidian" {
     collapseAll: boolean;
     sortOrder: string;
     renderMarkdown: boolean;
-    settings: Record<string, any>;
+    settings: Record<string, QueryControlSettingValue>;
     vChildren?: SearchResultRootElements;
     renderMarkdownButtonEl: HTMLElement;
     setRenderMarkdown(value: boolean): void;
@@ -105,14 +106,16 @@ declare module "obsidian" {
     computeSync(): void;
     update(match: SearchResultItemMatch, val1: number, val2: number, val3: number, val4: number): void;
     measure(parent: SearchResultItem, item: SearchResultItemMatch): void;
-    scrollIntoView(item: any): void;
+    scrollIntoView(item: unknown): void;
     getRootTop(): number;
-    findElementTop(a: any, b: any, c: any): void;
+    findElementTop(a: unknown, b: unknown, c: unknown): void;
     onScroll(): void; // this calls updateVirtualDisplay()
   }
   class SearchResultItem {
     renderContentMatches(): void;
-    onResultClick(event: MouseEvent, e?: any): void;
+    setCollapse(value: boolean, animate: boolean): void;
+    setExtraContext(value: boolean): void;
+    onResultClick(event: MouseEvent, e?: unknown): void;
     info: ItemInfo;
     collapsible: boolean;
     collapsed: boolean;
@@ -122,6 +125,7 @@ declare module "obsidian" {
     children: SearchResultItemMatch[];
     vChildren?: SearchResultMatchRootElements;
     file: TFile;
+    path: string;
     content: string;
     el: HTMLElement;
     pusherEl: HTMLElement;
@@ -133,9 +137,11 @@ declare module "obsidian" {
     start: number;
     end: number;
     parent: SearchResultItem;
+    parentDom: SearchResultItem;
+    el: HTMLElement;
     matches: MatchIndices[];
     info: ItemInfo;
-    onMatchRender?: (match: MatchIndices, el: HTMLElement) => any;
+    onMatchRender?: (match: MatchIndices, el: HTMLElement) => unknown;
   }
   type MatchIndices = number[];
   interface ItemInfo {
@@ -158,7 +164,7 @@ declare module "obsidian" {
     addNavButton(
         icon: string,
         label: string,
-        onClick: (evt: MouseEvent) => any,
+        onClick: (evt: MouseEvent) => unknown,
         className?: string
     ): HTMLElement;
   }
@@ -166,7 +172,7 @@ declare module "obsidian" {
     dom: SearchResultDOM;
     containerEl: HTMLElement;
     query: string;
-    settings: Record<string, any>;
+    settings: Record<string, QueryControlSettingValue>;
     onunload(): void;
     onload(): void;
   }
@@ -212,12 +218,12 @@ declare module "sortablejs" {
 
 declare module "obsidian" {
   export interface Workspace extends Events {
-    on(name: "view-registered", callback: (type: string, viewCreator: ViewCreator) => any, ctx?: any): EventRef;
-    on(name: "file-explorer-load", callback: (fileExplorer: FileExplorerView) => any, ctx?: any): EventRef;
-    on(name: "file-explorer-sort-change", callback: (sortMethod: string) => any, ctx?: any): EventRef;
-    on(name: "infinity-scroll-compute", callback: (infinityScroll: InfinityScroll) => any, ctx?: any): EventRef;
-    on(name: "file-explorer-draggable-change", callback: (dragEnabled: boolean) => any, ctx?: any): EventRef;
-    on(name: "file-explorer-filter-change", callback: (filterEnabled: boolean) => any, ctx?: any): EventRef;
+    on(name: "view-registered", callback: (type: string, viewCreator: ViewCreator) => unknown, ctx?: unknown): EventRef;
+    on(name: "file-explorer-load", callback: (fileExplorer: FileExplorerView) => unknown, ctx?: unknown): EventRef;
+    on(name: "file-explorer-sort-change", callback: (sortMethod: string) => unknown, ctx?: unknown): EventRef;
+    on(name: "infinity-scroll-compute", callback: (infinityScroll: InfinityScroll) => unknown, ctx?: unknown): EventRef;
+    on(name: "file-explorer-draggable-change", callback: (dragEnabled: boolean) => unknown, ctx?: unknown): EventRef;
+    on(name: "file-explorer-filter-change", callback: (filterEnabled: boolean) => unknown, ctx?: unknown): EventRef;
   }
   export interface PluginInstance {
     id: string;

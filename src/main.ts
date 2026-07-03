@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-this-alias */
 import {around} from "monkey-around";
 import {
   BacklinkDOMClass,
   BacklinksClass,
   Component,
   EmbeddedSearchClass,
-  Modal,
   Notice,
   Plugin,
   SearchResultDOM,
@@ -22,6 +20,13 @@ import {DEFAULT_SETTINGS, EmbeddedQueryControlSettings, SettingTab, sortOptions}
 import {translate} from "./utils";
 import {createSortPopup} from "./sort";
 import {SortOption} from "./obsidian";
+
+type PatchFn = (...args: unknown[]) => unknown;
+type SearchResultItemMatchConstructor = {
+  prototype: {
+    render: PatchFn;
+  };
+};
 
 // Live Preview creates an embedded query block
 // LP calls addChild with an instance of the EmbeddedSearch class
@@ -45,7 +50,7 @@ import {SortOption} from "./obsidian";
 //       - SearchResultItem
 //         - SearchResultItemMatch
 
-const backlinkDoms = new WeakMap<HTMLElement, any>();
+const backlinkDoms = new WeakMap<HTMLElement, BacklinksClass>();
 
 function hasOwn(value: unknown, key: PropertyKey): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -57,7 +62,7 @@ function createSearchHeaderDom(el: HTMLElement) {
 
   return {
     navHeaderEl,
-    addNavButton(icon: string, label: string, onClick: (evt: MouseEvent) => any, className?: string) {
+    addNavButton(icon: string, label: string, onClick: (evt: MouseEvent) => unknown, className?: string) {
       const buttonEl = navButtonsEl.createDiv("clickable-icon nav-action-button");
       if (className) buttonEl.addClass(className);
       buttonEl.addEventListener("click", onClick);
@@ -69,7 +74,6 @@ function createSearchHeaderDom(el: HTMLElement) {
 }
 
 export default class EmbeddedQueryControlPlugin extends Plugin {
-  SearchResultsExport: any;
   settings: EmbeddedQueryControlSettings;
   settingsTab: SettingTab;
   isSearchResultItemPatched: boolean;
@@ -83,7 +87,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
     this.registerSettingsTab();
     this.register(
         around(this.app.viewRegistry.constructor.prototype, {
-          registerView(old: any) {
+          registerView(old: PatchFn) {
             return function (type: string, viewCreator: ViewCreator, ...args: unknown[]) {
               plugin.app.workspace.trigger("view-registered", type, viewCreator);
               return old.call(this, type, viewCreator, ...args);
@@ -95,20 +99,10 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
       const eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
         if (type !== "search") return;
         this.app.workspace.offref(eventRef);
-        // @ts-ignore we need a leaf before any leafs exists in the workspace, so we create one from scratch
-        const leaf = new WorkspaceLeaf(plugin.app);
+        const Leaf = WorkspaceLeaf as unknown as new (app: typeof plugin.app) => WorkspaceLeaf;
+        const leaf = new Leaf(plugin.app);
         const searchView = viewCreator(leaf) as SearchView;
         plugin.patchNativeSearch(searchView);
-        const uninstall = around(Modal.prototype, {
-          open(old: any) {
-            return function (...args: any[]) {
-              plugin.SearchResultsExport = this.constructor;
-              return;
-            };
-          },
-        });
-        searchView.onCopyResultsClick(new MouseEvent(null));
-        uninstall();
       });
     }
 
@@ -116,8 +110,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
     // The following will patch Component.addChild and will remove itself once it finds and patches EmbeddedSearch
     this.register(
         around(Component.prototype, {
-          addChild(old: any) {
-            return function (child: unknown, ...args: any[]) {
+          addChild(old: PatchFn) {
+            return function (child: unknown, ...args: unknown[]) {
               try {
                 if (
                     !plugin.isSearchPatched &&
@@ -132,7 +126,10 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                 }
                 if (child instanceof Component && hasOwn(child, "backlinkDom")) {
                   const backlinks = child as BacklinksClass;
-                  backlinkDoms.set(backlinks.backlinkDom.el.closest(".backlink-pane"), child);
+                  const backlinkPane = backlinks.backlinkDom.el.closest(".backlink-pane");
+                  if (backlinkPane instanceof HTMLElement) {
+                    backlinkDoms.set(backlinkPane, backlinks);
+                  }
                   if (!plugin.isBacklinksPatched) {
                     plugin.patchBacklinksView(backlinks);
                     plugin.isBacklinksPatched = true;
@@ -173,13 +170,13 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
     const plugin = this;
     this.register(
         around(searchView.constructor.prototype, {
-          onResize(old: any) {
-            return function (...args: any[]) {
+          onResize(old: PatchFn) {
+            return function (...args: unknown[]) {
               // this works around measurement issues when the search el width
               // goes to zero and then back to a non-zero value
               const _children = this.dom.vChildren?._children;
               if (this.dom.el.clientWidth === 0) {
-                _children.forEach((child: any) => {
+                _children.forEach((child: SearchResultItem) => {
                   child.setCollapse(true, false);
                 });
                 this.dom.hidden = true;
@@ -187,7 +184,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                 this.dom.hidden = false;
                 // if we toggle too quickly, measurement happens before we want it to
                 window.setTimeout(() => {
-                  _children.forEach((child: any) => {
+                  _children.forEach((child: SearchResultItem) => {
                     child.setCollapse(this.dom.collapseAll, false);
                   });
                 }, 100);
@@ -195,8 +192,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
               return old.call(this, ...args);
             };
           },
-          stopSearch(old: any) {
-            return function (...args: any[]) {
+          stopSearch(old: PatchFn) {
+            return function (...args: unknown[]) {
               const result = old.call(this, ...args);
               if (this.renderComponent) {
                 this.renderComponent.unload();
@@ -205,8 +202,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
               return result;
             };
           },
-          addChild(old: any) {
-            return function (...args: any[]) {
+          addChild(old: PatchFn) {
+            return function (...args: unknown[]) {
               try {
                 if (!this.patched) {
                   if (!this.renderComponent) {
@@ -219,7 +216,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                   this.setRenderMarkdown = function (value: boolean) {
                     const _children = this.dom.vChildren?._children;
                     this.dom.renderMarkdown = value;
-                    _children.forEach((child: any) => {
+                    _children.forEach((child: SearchResultItem) => {
                       child.renderContentMatches();
                     });
                     this.dom.infinityScroll.invalidateAll();
@@ -258,13 +255,13 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
   patchSearchResultDOM(SearchResult: typeof SearchResultDOM) {
     const plugin = this;
     const uninstall = around(SearchResult.prototype, {
-      addResult(old: any) {
-        return function (...args: any[]) {
+      addResult(old: PatchFn) {
+        return function (...args: unknown[]) {
           uninstall();
-          const result = old.call(this, ...args);
-          const SearchResultItem = result.constructor;
+          const result = old.call(this, ...args) as SearchResultItem;
+          const SearchResultItemClass = result.constructor as typeof SearchResultItem;
           if (!plugin.isSearchResultItemPatched) {
-            plugin.patchSearchResultItem(SearchResultItem);
+            plugin.patchSearchResultItem(SearchResultItemClass);
           }
           return result;
         };
@@ -276,8 +273,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
           // startLoader is called for many different use cases
           // in this patch, we try to determine the context we were called in
           // if we recognize a context (backlinks, embedded search, native search), we patch it
-          startLoader(old: any) {
-            return function (...args: any[]) {
+          startLoader(old: PatchFn) {
+            return function (...args: unknown[]) {
               try {
                 // Are we in a backlinks view?
                 const containerEl = this.el.closest(".backlink-pane");
@@ -304,7 +301,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                         toggle.onChange((value) => {
                           this.renderMarkdown = value;
                           const _children = this.vChildren?._children;
-                          _children.forEach((child: any) => {
+                          _children.forEach((child: SearchResultItem) => {
                             child.renderContentMatches();
                           });
                           this.infinityScroll.invalidateAll();
@@ -325,7 +322,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                       const _children = this.vChildren?._children;
                       this.extraContext = value;
                       this.extraContextButtonEl.toggleClass("is-active", value);
-                      _children.forEach((child: any) => {
+                      _children.forEach((child: SearchResultItem) => {
                         child.setExtraContext(value);
                       });
                       this.infinityScroll.invalidateAll();
@@ -343,7 +340,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                     this.setRenderMarkdown = function (value: boolean) {
                       this.renderMarkdown = value;
                       const _children = this.vChildren?._children;
-                      _children.forEach((child: any) => {
+                      _children.forEach((child: SearchResultItem) => {
                         child.renderContentMatches();
                       });
                       this.infinityScroll.invalidateAll();
@@ -355,7 +352,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                       const _children = this.vChildren?._children;
                       this.collapseAllButtonEl.toggleClass("is-active", value);
                       this.collapseAll = value;
-                      _children.forEach((child: any) => {
+                      _children.forEach((child: SearchResultItem) => {
                         child.setCollapse(value, false);
                       });
                       this.infinityScroll.invalidateAll();
@@ -489,8 +486,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
     this.isSearchResultItemPatched = true;
     const plugin = this;
     const uninstall = around(SearchResultItemClass.prototype, {
-      onResultClick(old: any) {
-        return function (event: MouseEvent, e: any, ...args: any[]) {
+      onResultClick(old: PatchFn) {
+        return function (event: MouseEvent, e: unknown, ...args: unknown[]) {
           if (
               // TODO: Improve this exclusion list which allows for clicking
               //       on elements without navigating to the match result
@@ -505,8 +502,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
           }
         };
       },
-      renderContentMatches(old: any) {
-        return function (...args: any[]) {
+      renderContentMatches(old: PatchFn) {
+        return function (...args: unknown[]) {
           // TODO: Move this to its own around registration and uninstall on patch
           const result = old.call(this, ...args);
           const _children = this.vChildren?._children;
@@ -521,13 +518,13 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
     plugin.register(uninstall);
   }
 
-  patchSearchResultItemMatch(SearchResultItemMatch: any) {
+  patchSearchResultItemMatch(SearchResultItemMatch: SearchResultItemMatchConstructor) {
     this.isSearchResultItemMatchPatched = true;
     const plugin = this;
     plugin.register(
         around(SearchResultItemMatch.prototype, {
-          render(old: any) {
-            return function (...args: any[]) {
+          render(old: PatchFn) {
+            return function (...args: unknown[]) {
               // NOTE: if we don't mangle ```query blocks, we could end up with infinite query recursion
               const _parent = this.parentDom;
               let content = _parent.content.substring(this.start, this.end).replace("```query", "\\`\\`\\`query");
@@ -563,8 +560,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
 
     this.register(
         around(EmbeddedSearch.prototype, {
-          onunload(old: any) {
-            return function (...args: any[]) {
+          onunload(old: PatchFn) {
+            return function (...args: unknown[]) {
               if (this.renderComponent) {
                 this.renderComponent.unload();
                 this.dom = null;
@@ -578,8 +575,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
               return result;
             };
           },
-          onload(old: any) {
-            return function (...args: any[]) {
+          onload(old: PatchFn) {
+            return function (...args: unknown[]) {
               try {
                 if (!this.renderComponent) {
                   this.renderComponent = new Component();
@@ -624,8 +621,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
 
     this.register(
         around(Backlink.prototype, {
-          onunload(old: any) {
-            return function (...args: any[]) {
+          onunload(old: PatchFn) {
+            return function (...args: unknown[]) {
               if (this.renderComponent) {
                 this.renderComponent.unload();
                 this.dom = null;
@@ -638,8 +635,8 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
               return result;
             };
           },
-          onload(old: any) {
-            return function (...args: any[]) {
+          onload(old: PatchFn) {
+            return function (...args: unknown[]) {
               try {
                 if (!this.renderComponent) {
                   this.renderComponent = new Component();
@@ -679,7 +676,7 @@ function handleBacklinks(
       doms.forEach(dom => {
         dom.renderMarkdown = value;
         const _children = dom.vChildren?._children;
-        _children.forEach((child: any) => {
+        _children.forEach((child: SearchResultItem) => {
           child.renderContentMatches();
         });
         dom.infinityScroll.invalidateAll();
@@ -750,10 +747,9 @@ function handleBacklinks(
         instance.settings[setting] = defaultValue;
       }
     });
-    backlinksInstance.setExtraContext(instance.settings.context);
-    backlinksInstance.sortOrder = instance.settings.sort;
-    backlinksInstance.setCollapseAll(instance.settings.collapsed);
-    instance.setRenderMarkdown(instance.settings.renderMarkdown);
+    backlinksInstance.setExtraContext(instance.settings.context === true);
+    backlinksInstance.sortOrder = String(instance.settings.sort);
+    backlinksInstance.setCollapseAll(instance.settings.collapsed === true);
+    instance.setRenderMarkdown(instance.settings.renderMarkdown === true);
   }
 }
-

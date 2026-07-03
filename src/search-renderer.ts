@@ -1,17 +1,28 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import { App, MarkdownRenderer, TFile } from "obsidian";
+
+interface SearchMatchLike {
+  start: number;
+  end: number;
+  parent: {
+    file: TFile;
+    content: string;
+  };
+  parentDom: {
+    path: string;
+    file: TFile;
+  };
+}
 
 export class SearchMarkdownRenderer extends MarkdownRenderer {
   app: App;
   subpath: string;
   indent: string;
   file: TFile;
-  match: any;
+  match: SearchMatchLike;
   filePath: string;
 
-  constructor(app: App, containerEl: HTMLElement, match: any) {
-    // @ts-ignore
-    super(app, containerEl);
+  constructor(app: App, containerEl: HTMLElement, match: SearchMatchLike) {
+    super(containerEl);
     this.app = app;
     this.match = match;
     this.subpath = "";

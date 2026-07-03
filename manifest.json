@@ -1,7 +1,7 @@
 {
   "id": "query-control",
   "name": "Query Control",
-  "version": "0.7.18",
+  "version": "0.7.19",
   "minAppVersion": "1.7.2",
   "description": "Adds extra controls for embedded query, search, and backlinks results.",
   "author": "NothingIsLost & reply2za",
