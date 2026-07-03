@@ -1,4 +1,4 @@
-import type { i18n } from "i18next";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import "obsidian";
 
 declare module "obsidian" {
@@ -37,17 +37,41 @@ declare module "obsidian" {
   }
 
   class SearchResultDOM {
+    el: HTMLElement;
+    childrenEl: HTMLElement;
     startLoader(): void;
     infinityScroll: InfinityScroll;
     patched: boolean;
+    hidden: boolean;
+    renderMarkdown: boolean;
+    extraContext: boolean;
+    showTitle: boolean;
+    collapseAll: boolean;
+    sortOrder: string;
+    settings: Record<string, any>;
+    vChildren?: SearchResultRootElements;
+    parent?: SearchView;
     children: SearchResultItem[];
     addResult(): void;
     removeResult(): void;
   }
   class BacklinkDOMClass {
+    el: HTMLElement;
+    childrenEl: HTMLElement;
     startLoader(): void;
     infinityScroll: InfinityScroll;
     patched: boolean;
+    hidden: boolean;
+    extraContext: boolean;
+    showTitle: boolean;
+    collapseAll: boolean;
+    sortOrder: string;
+    renderMarkdown: boolean;
+    settings: Record<string, any>;
+    vChildren?: SearchResultRootElements;
+    renderMarkdownButtonEl: HTMLElement;
+    setRenderMarkdown(value: boolean): void;
+    onCopyResultsClick(event: MouseEvent): Promise<void>;
     children: SearchResultItem[];
     addResult(): void;
     removeResult(): void;
@@ -62,7 +86,7 @@ declare module "obsidian" {
   }
 
   interface Vault {
-    config: {};
+    config: Record<string, unknown>;
     getConfig<T extends keyof VaultSettings>(setting: T): VaultSettings[T];
   }
 
@@ -96,6 +120,7 @@ declare module "obsidian" {
     showTitle: boolean;
     parent: SearchResultDOM;
     children: SearchResultItemMatch[];
+    vChildren?: SearchResultMatchRootElements;
     file: TFile;
     content: string;
     el: HTMLElement;
@@ -121,6 +146,12 @@ declare module "obsidian" {
     queued: boolean;
     hidden: boolean;
   }
+  interface SearchResultRootElements {
+    _children: SearchResultItem[];
+  }
+  interface SearchResultMatchRootElements {
+    _children: SearchResultItemMatch[];
+  }
   class SearchHeaderDOM {
     constructor(app: App, el: HTMLElement);
     navHeaderEl: HTMLElement;
@@ -132,12 +163,21 @@ declare module "obsidian" {
     ): HTMLElement;
   }
   class EmbeddedSearchClass extends MarkdownRenderChild {
-    dom?: SearchResult;
+    dom: SearchResultDOM;
+    containerEl: HTMLElement;
+    query: string;
+    settings: Record<string, any>;
     onunload(): void;
     onload(): void;
   }
   class BacklinksClass extends Component {
-    backlinkDom: {el: HTMLElement}
+    backlinkDom: BacklinkDOMClass;
+    unlinkedDom: BacklinkDOMClass;
+    headerDom: SearchHeaderDOM;
+    patched: boolean;
+    sortOrder: string;
+    setExtraContext(value: boolean): void;
+    setCollapseAll(value: boolean): void;
   }
   interface WorkspaceItem {
     tabsInnerEl: HTMLElement;
@@ -159,7 +199,9 @@ declare module "obsidian" {
 }
 
 declare global {
-  const i18next: i18n;
+  const i18next: {
+    t(key: string, options?: Record<string, unknown>): string;
+  };
 }
 
 declare module "sortablejs" {
@@ -210,7 +252,9 @@ declare module "obsidian" {
     addSortButton(sorter: (sortType: string) => void, sortOrder: () => string): void;
     navHeaderEl: HTMLElement;
   }
-  interface FileExplorerFolder {}
+  interface FileExplorerFolder {
+    el?: HTMLElement;
+  }
   export interface FileExplorerViewDom {
     infinityScroll: InfinityScroll;
     navFileContainerEl: HTMLElement;

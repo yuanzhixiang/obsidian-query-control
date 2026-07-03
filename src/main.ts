@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-this-alias */
 import {around} from "monkey-around";
 import {
   BacklinkDOMClass,
@@ -46,6 +47,10 @@ import {SortOption} from "./obsidian";
 
 const backlinkDoms = new WeakMap<HTMLElement, any>();
 
+function hasOwn(value: unknown, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
 function createSearchHeaderDom(el: HTMLElement) {
   const navHeaderEl = el.createDiv({cls: "nav-header", prepend: true});
   const navButtonsEl = navHeaderEl.createDiv("nav-buttons-container");
@@ -74,7 +79,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
-    let plugin = this;
+    const plugin = this;
     this.registerSettingsTab();
     this.register(
         around(this.app.viewRegistry.constructor.prototype, {
@@ -86,16 +91,15 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
           },
         })
     );
-    let uninstall: () => void;
     if (!this.app.workspace.layoutReady) {
-      let eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
+      const eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
         if (type !== "search") return;
         this.app.workspace.offref(eventRef);
         // @ts-ignore we need a leaf before any leafs exists in the workspace, so we create one from scratch
-        let leaf = new WorkspaceLeaf(plugin.app);
-        let searchView = viewCreator(leaf) as SearchView;
+        const leaf = new WorkspaceLeaf(plugin.app);
+        const searchView = viewCreator(leaf) as SearchView;
         plugin.patchNativeSearch(searchView);
-        let uninstall = around(Modal.prototype, {
+        const uninstall = around(Modal.prototype, {
           open(old: any) {
             return function (...args: any[]) {
               plugin.SearchResultsExport = this.constructor;
@@ -111,23 +115,23 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
     // The only way to obtain the EmbeddedSearch class is to catch it while it's being added to a parent component
     // The following will patch Component.addChild and will remove itself once it finds and patches EmbeddedSearch
     this.register(
-        (uninstall = around(Component.prototype, {
+        around(Component.prototype, {
           addChild(old: any) {
             return function (child: unknown, ...args: any[]) {
               try {
                 if (
                     !plugin.isSearchPatched &&
                     child instanceof Component &&
-                    child.hasOwnProperty("searchQuery") &&
-                    child.hasOwnProperty("sourcePath") &&
-                    child.hasOwnProperty("dom")
+                    hasOwn(child, "searchQuery") &&
+                    hasOwn(child, "sourcePath") &&
+                    hasOwn(child, "dom")
                 ) {
-                  let EmbeddedSearch = child as EmbeddedSearchClass;
+                  const EmbeddedSearch = child as EmbeddedSearchClass;
                   plugin.patchSearchView(EmbeddedSearch);
                   plugin.isSearchPatched = true;
                 }
-                if (child instanceof Component && child.hasOwnProperty("backlinkDom")) {
-                  let backlinks = child as BacklinksClass;
+                if (child instanceof Component && hasOwn(child, "backlinkDom")) {
+                  const backlinks = child as BacklinksClass;
                   backlinkDoms.set(backlinks.backlinkDom.el.closest(".backlink-pane"), child);
                   if (!plugin.isBacklinksPatched) {
                     plugin.patchBacklinksView(backlinks);
@@ -141,7 +145,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
               return result;
             };
           },
-        }))
+        })
     );
   }
 
@@ -182,7 +186,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
               } else if (this.dom.hidden) {
                 this.dom.hidden = false;
                 // if we toggle too quickly, measurement happens before we want it to
-                setTimeout(() => {
+                window.setTimeout(() => {
                   _children.forEach((child: any) => {
                     child.setCollapse(this.dom.collapseAll, false);
                   });
@@ -227,14 +231,14 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                     return this.setRenderMarkdown(!this.dom.renderMarkdown);
                   });
 
-                  let allSettings = {
+                  const allSettings = {
                     renderMarkdown: plugin.settings.defaultRenderMarkdown,
                   };
                   if (!this.settings) this.settings = {};
                   Object.entries(allSettings).forEach(([setting, defaultValue]) => {
-                    if (!this.settings.hasOwnProperty(setting)) {
+                    if (!hasOwn(this.settings, setting)) {
                       this.settings[setting] = defaultValue;
-                    } else if (setting === "sort" && !sortOptions.hasOwnProperty(this.settings.sort)) {
+                    } else if (setting === "sort" && !sortOptions.some(option => option.key === this.settings.sort)) {
                       this.settings[setting] = defaultValue;
                     }
                   });
@@ -253,12 +257,12 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
 
   patchSearchResultDOM(SearchResult: typeof SearchResultDOM) {
     const plugin = this;
-    let uninstall = around(SearchResult.prototype, {
+    const uninstall = around(SearchResult.prototype, {
       addResult(old: any) {
         return function (...args: any[]) {
           uninstall();
           const result = old.call(this, ...args);
-          let SearchResultItem = result.constructor;
+          const SearchResultItem = result.constructor;
           if (!plugin.isSearchResultItemPatched) {
             plugin.patchSearchResultItem(SearchResultItem);
           }
@@ -365,21 +369,21 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                       event.preventDefault();
 
                       // Collect the search results
-                      let results = [];
+                      const results = [];
                       const _children = this.vChildren?._children;
 
-                      for (let item of _children) {
-                        let filePath = item.file.path;
+                      for (const item of _children) {
+                        const filePath = item.file.path;
                         let matchesText = '';
                         const matches = item.vChildren?._children;
-                        for (let match of matches) {
-                          let content = match.parent.content.substring(match.start, match.end);
+                        for (const match of matches) {
+                          const content = match.parent.content.substring(match.start, match.end);
                           matchesText += content + '\n';
                         }
                         results.push(`## ${filePath}\n${matchesText}`);
                       }
 
-                      let resultsText = results.join('\n');
+                      const resultsText = results.join('\n');
                       try {
                         await navigator.clipboard.writeText(resultsText);
                         new Notice('Search results copied to clipboard.');
@@ -390,7 +394,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                     };
 
 
-                    let headerDom = (this.headerDom = createSearchHeaderDom(this.el.parentElement));
+                    const headerDom = (this.headerDom = createSearchHeaderDom(this.el.parentElement));
                     defaultHeaderEl.insertAdjacentElement("afterend", headerDom.navHeaderEl);
                     this.collapseAllButtonEl = headerDom.addNavButton(
                         "bullet-list",
@@ -444,7 +448,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                       return this.setRenderMarkdown(!this.renderMarkdown);
                     });
                     headerDom.addNavButton("documents", "Copy results", this.onCopyResultsClick.bind(this));
-                    let allSettings = {
+                    const allSettings = {
                       title: plugin.settings.defaultHideResults,
                       collapsed: plugin.settings.defaultCollapse,
                       context: plugin.settings.defaultShowContext,
@@ -455,9 +459,9 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                     };
                     if (!this.settings) this.settings = {};
                     Object.entries(allSettings).forEach(([setting, defaultValue]) => {
-                      if (!this.settings.hasOwnProperty(setting)) {
+                      if (!hasOwn(this.settings, setting)) {
                         this.settings[setting] = defaultValue;
-                      } else if (setting === "sort" && !sortOptions.hasOwnProperty(this.settings.sort)) {
+                      } else if (setting === "sort" && !sortOptions.some(option => option.key === this.settings.sort)) {
                         this.settings[setting] = defaultValue;
                       }
                     });
@@ -484,7 +488,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
   patchSearchResultItem(SearchResultItemClass: typeof SearchResultItem) {
     this.isSearchResultItemPatched = true;
     const plugin = this;
-    let uninstall = around(SearchResultItemClass.prototype, {
+    const uninstall = around(SearchResultItemClass.prototype, {
       onResultClick(old: any) {
         return function (event: MouseEvent, e: any, ...args: any[]) {
           if (
@@ -507,7 +511,7 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
           const result = old.call(this, ...args);
           const _children = this.vChildren?._children;
           if (!plugin.isSearchResultItemMatchPatched && _children.length) {
-            let SearchResultItemMatch = _children.first().constructor;
+            const SearchResultItemMatch = _children.first().constructor;
             plugin.patchSearchResultItemMatch(SearchResultItemMatch);
           }
           return result;
@@ -525,17 +529,17 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
           render(old: any) {
             return function (...args: any[]) {
               // NOTE: if we don't mangle ```query blocks, we could end up with infinite query recursion
-              let _parent = this.parentDom;
+              const _parent = this.parentDom;
               let content = _parent.content.substring(this.start, this.end).replace("```query", "\\`\\`\\`query");
-              let leadingSpaces = content.match(/^\s+/g)?.first();
+              const leadingSpaces = content.match(/^\s+/g)?.first();
               if (leadingSpaces) {
                 content = content.replace(new RegExp(`^${leadingSpaces}`, "gm"), "");
               }
-              let parentComponent = _parent.parent.parent;
+              const parentComponent = _parent.parent.parent;
               if (parentComponent && _parent.parent.renderMarkdown) {
-                let component = parentComponent?.renderComponent;
+                const component = parentComponent?.renderComponent;
                 this.el.empty();
-                let renderer = new SearchMarkdownRenderer(plugin.app, this.el, this);
+                const renderer = new SearchMarkdownRenderer(plugin.app, this.el, this);
                 renderer.onRenderComplete = () => {
                   // TODO: See if we can improve measurement
                   // It exists because the markdown renderer is rendering async
@@ -582,19 +586,20 @@ export default class EmbeddedQueryControlPlugin extends Plugin {
                   this.renderComponent.load();
                 }
                 this.dom.parent = this;
-                let defaultHeaderEl = this.containerEl.parentElement.querySelector(
+                const defaultHeaderEl = this.containerEl.parentElement.querySelector(
                     ".internal-query-header"
                 ) as HTMLElement;
-                let matches = this.query.matchAll(
-                    /^(?<key>collapsed|context|hideTitle|renderMarkdown|hideResults|sort|title):\s*(?<value>.+?)$/gm
+                const matches = this.query.matchAll(
+                    /^(collapsed|context|hideTitle|renderMarkdown|hideResults|sort|title):\s*(.+?)$/gm
                 );
-                let settings: Record<string, string> = {};
-                for (let match of matches) {
-                  let value = match.groups.value.toLowerCase();
+                const settings: Record<string, string | boolean> = {};
+                for (const match of matches) {
+                  const key = match[1];
+                  let value: string | boolean = match[2].toLowerCase();
                   if (value === "true" || value === "false") {
-                    match.groups.value = value === "true";
+                    value = value === "true";
                   }
-                  settings[match.groups.key] = match.groups.value;
+                  settings[key] = value;
                 }
                 this.query = this.query
                     .replace(/^((collapsed|context|hideTitle|renderMarkdown|hideResults|sort|title):.+?)$/gm, "")
@@ -690,25 +695,25 @@ function handleBacklinks(
       event.preventDefault();
 
       // Collect the search results
-      let results = [];
+      const results = [];
       const doms = [backlinksInstance.backlinkDom, backlinksInstance.unlinkedDom];
 
-      for (let dom of doms) {
+      for (const dom of doms) {
         const _children = dom.vChildren?._children;
 
-        for (let item of _children) {
-          let filePath = item.file.path;
+        for (const item of _children) {
+          const filePath = item.file.path;
           let matchesText = '';
           const matches = item.vChildren?._children;
-          for (let match of matches) {
-            let content = match.parent.content.substring(match.start, match.end);
+          for (const match of matches) {
+            const content = match.parent.content.substring(match.start, match.end);
             matchesText += content + '\n';
           }
           results.push(`## ${filePath}\n${matchesText}`);
         }
       }
 
-      let resultsText = results.join('\n');
+      const resultsText = results.join('\n');
       try {
         await navigator.clipboard.writeText(resultsText);
       } catch (err) {
@@ -728,7 +733,7 @@ function handleBacklinks(
     );
     backlinksInstance.headerDom.addNavButton("documents", "Copy results", instance.onCopyResultsClick.bind(instance));
 
-    let allSettings = {
+    const allSettings = {
       title: plugin.settings.defaultHideResults,
       collapsed: plugin.settings.defaultCollapse,
       context: plugin.settings.defaultShowContext,
@@ -739,9 +744,9 @@ function handleBacklinks(
     };
     if (!instance.settings) instance.settings = {};
     Object.entries(allSettings).forEach(([setting, defaultValue]) => {
-      if (!instance.settings.hasOwnProperty(setting)) {
+      if (!hasOwn(instance.settings, setting)) {
         instance.settings[setting] = defaultValue;
-      } else if (setting === "sort" && !sortOptions.hasOwnProperty(instance.settings.sort)) {
+      } else if (setting === "sort" && !sortOptions.some(option => option.key === instance.settings.sort)) {
         instance.settings[setting] = defaultValue;
       }
     });

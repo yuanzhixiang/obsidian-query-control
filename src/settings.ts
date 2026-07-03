@@ -56,35 +56,35 @@ export class SettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Collapse query results by default").addToggle(toggle =>
       toggle.setValue(this.plugin.settings.defaultCollapse).onChange(value => {
         this.plugin.settings.defaultCollapse = value;
-        this.plugin.saveSettings();
+        void this.plugin.saveSettings();
       })
     );
 
     new Setting(containerEl).setName("Show additional query result context by default").addToggle(toggle =>
       toggle.setValue(this.plugin.settings.defaultShowContext).onChange(value => {
         this.plugin.settings.defaultShowContext = value;
-        this.plugin.saveSettings();
+        void this.plugin.saveSettings();
       })
     );
 
     new Setting(containerEl).setName("Hide query title by default").addToggle(toggle =>
       toggle.setValue(this.plugin.settings.defaultHideTitle).onChange(value => {
         this.plugin.settings.defaultHideTitle = value;
-        this.plugin.saveSettings();
+        void this.plugin.saveSettings();
       })
     );
 
     new Setting(containerEl).setName("Hide query results by default").addToggle(toggle =>
       toggle.setValue(this.plugin.settings.defaultHideResults).onChange(value => {
         this.plugin.settings.defaultHideResults = value;
-        this.plugin.saveSettings();
+        void this.plugin.saveSettings();
       })
     );
 
     new Setting(containerEl).setName("Render results as Markdown by default").addToggle(toggle =>
       toggle.setValue(this.plugin.settings.defaultRenderMarkdown).onChange(value => {
         this.plugin.settings.defaultRenderMarkdown = value;
-        this.plugin.saveSettings();
+        void this.plugin.saveSettings();
       })
     );
 
@@ -92,7 +92,7 @@ export class SettingTab extends PluginSettingTab {
       cb.addOptions(convertToRecord(sortOptions));
       cb.setValue(this.plugin.settings.defaultSortOrder);
       cb.onChange(async value => {
-        (this.plugin.settings.defaultSortOrder as any) = value;
+        this.plugin.settings.defaultSortOrder = value;
         await this.plugin.saveSettings();
       });
     });

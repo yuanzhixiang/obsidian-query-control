@@ -1,2 +1,1 @@
-export const translate = i18next.t.bind(i18next);
-
+export const translate = (key: string): string => i18next.t(key);

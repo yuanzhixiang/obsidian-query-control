@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import { App, MarkdownRenderer, TFile } from "obsidian";
 
 export class SearchMarkdownRenderer extends MarkdownRenderer {
@@ -24,11 +25,11 @@ export class SearchMarkdownRenderer extends MarkdownRenderer {
   }
 
   updateOptions() {
-    let readableLineLength = this.app.vault.getConfig("readableLineLength");
+    const readableLineLength = this.app.vault.getConfig("readableLineLength");
     this.renderer.previewEl.toggleClass("is-readable-line-width", readableLineLength);
-    let foldHeading = this.app.vault.getConfig("foldHeading");
+    const foldHeading = this.app.vault.getConfig("foldHeading");
     this.renderer.previewEl.toggleClass("allow-fold-headings", foldHeading);
-    let foldIndent = this.app.vault.getConfig("foldIndent");
+    const foldIndent = this.app.vault.getConfig("foldIndent");
     this.renderer.previewEl.toggleClass("allow-fold-lists", foldIndent);
     this.renderer.previewEl.toggleClass("rtl", this.app.vault.getConfig("rightToLeft"));
 
@@ -41,7 +42,7 @@ export class SearchMarkdownRenderer extends MarkdownRenderer {
     }
 
     this.renderer.previewEl.toggleClass("show-frontmatter", this.app.vault.getConfig("showFrontmatter"));
-    let tabSize = this.app.vault.getConfig("tabSize");
+    const tabSize = this.app.vault.getConfig("tabSize");
     // this.renderer.previewEl.style.tabSize = String(tabSize);
     this.renderer.previewEl.style.setProperty('--tab-size', `${tabSize}px`);
     this.renderer.rerender();
@@ -55,14 +56,14 @@ export class SearchMarkdownRenderer extends MarkdownRenderer {
 
   async edit(content: string) {
     this.renderer.set(content);
-    let cachedContent = await this.app.vault.cachedRead(this.file);
-    let matchContent = cachedContent.slice(this.match.start, this.match.end);
-    let leadingSpaces = matchContent.match(/^\s+/g)?.first();
+    const cachedContent = await this.app.vault.cachedRead(this.file);
+    const matchContent = cachedContent.slice(this.match.start, this.match.end);
+    const leadingSpaces = matchContent.match(/^\s+/g)?.first();
     if (leadingSpaces) {
       content = content.replace(/^/gm, leadingSpaces);
     }
-    let before = cachedContent.slice(0, this.match.start);
-    let after = cachedContent.slice(this.match.end, this.match.parent.content.length);
+    const before = cachedContent.slice(0, this.match.start);
+    const after = cachedContent.slice(this.match.end, this.match.parent.content.length);
     const combinedContent = before + content + after;
     await this.app.vault.modify(this.file, combinedContent);
   }
